@@ -5,6 +5,8 @@ import io.swagger.v3.oas.annotations.Parameter;
 import lt.daiva.bankstatement.dto.BalanceResponse;
 import lt.daiva.bankstatement.service.BankStatementService;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,6 +18,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -61,5 +65,39 @@ public class BankStatementController {
                     example = "2025-01-05T23:59:59")
             LocalDateTime to) {
         return service.calculateBalance(accountNumber, from, to);
+    }
+
+    @GetMapping(value = "/export", produces = "text/csv")
+    @Operation(
+            summary = "Export bank statement to CSV",
+            description = "Exports operations for one or several accounts. Optional date range filters are ISO date-time."
+    )
+    public ResponseEntity<byte[]> exportCsv(
+            @RequestParam
+            @Parameter(description = "One or more account numbers", example = "LT100001")
+            List<String> accounts,
+
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            @Parameter(description = "Start date-time (ISO)", example = "2025-01-02T00:00:00")
+            LocalDateTime from,
+
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            @Parameter(description = "End date-time (ISO)", example = "2025-01-05T23:59:59")
+            LocalDateTime to
+    ) {
+        byte[] csv = service.exportToCsv(accounts, from, to);
+
+        String filename = "bank-statement-"
+                + LocalDateTime.now()
+                .format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+                + ".csv";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .body(csv);
     }
 }
