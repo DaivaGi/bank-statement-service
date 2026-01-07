@@ -1,5 +1,6 @@
 package lt.daiva.bankstatement.service;
 
+import lt.daiva.bankstatement.dto.BalanceResponse;
 import lt.daiva.bankstatement.model.BankOperation;
 import lt.daiva.bankstatement.repository.BankOperationRepository;
 import org.apache.commons.csv.CSVFormat;
@@ -58,5 +59,14 @@ public class BankStatementService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to import CSV file", e);
         }
+    }
+
+    public BalanceResponse calculateBalance(String accountNumber,
+                                            LocalDateTime from,
+                                            LocalDateTime to) {
+
+        BigDecimal balance = repository.calculateBalance(accountNumber, from, to);
+
+        return new BalanceResponse(accountNumber, balance, "EUR");
     }
 }
