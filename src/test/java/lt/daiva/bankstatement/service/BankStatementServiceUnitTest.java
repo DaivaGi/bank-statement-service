@@ -1,6 +1,7 @@
 package lt.daiva.bankstatement.service;
 
 import lt.daiva.bankstatement.dto.BalanceResponse;
+import lt.daiva.bankstatement.dto.CurrencyBalance;
 import lt.daiva.bankstatement.dto.ExportResult;
 import lt.daiva.bankstatement.exception.BankStatementException;
 import lt.daiva.bankstatement.model.BankOperation;
@@ -50,37 +51,29 @@ class BankStatementServiceUnitTest {
     }
 
     @Test
-    void calculateBalance_shouldReturnZero_whenRepositoryReturnsNull() {
-        when(bankOperationRepository.calculateBalance(eq("LT100001"), any(), any()))
-                .thenReturn(null);
+    void calculateBalance_shouldReturnBalancesByCurrency() {
+        when(bankOperationRepository.calculateBalancesByCurrency(eq("LT100001"), any(), any()))
+                .thenReturn(List.of(new CurrencyBalance("EUR", new BigDecimal("10.00"))));
 
-        BalanceResponse response = bankStatementService.calculateBalance(
-                "LT100001",
-                LocalDateTime.parse("2025-01-01T00:00:00"),
-                LocalDateTime.parse("2025-01-31T23:59:59")
-        );
+        BalanceResponse response = bankStatementService.calculateBalance("LT100001", null, null);
 
         assertEquals("LT100001", response.accountNumber());
-        assertEquals(0, response.balance().compareTo(new BigDecimal("0.00")));
-        assertEquals("EUR", response.currency());
 
-        verify(bankOperationRepository).calculateBalance(eq("LT100001"), any(), any());
+        assertEquals(1, response.balances().size());
+        assertEquals("EUR", response.balances().get(0).currency());
+        assertEquals(0, response.balances().get(0).amount().compareTo(new BigDecimal("10.00")));
     }
 
     @Test
-    void calculateBalance_shouldReturnRepositorySum() {
-        when(bankOperationRepository.calculateBalance(eq("LT100001"), any(), any()))
-                .thenReturn(new BigDecimal("10.00"));
+    void calculateBalance_shouldReturnEmptyList_whenNoOperationsFound() {
+        when(bankOperationRepository.calculateBalancesByCurrency(eq("LT100001"), any(), any()))
+                .thenReturn(List.of());
 
-        BalanceResponse response = bankStatementService.calculateBalance(
-                "LT100001",
-                null,
-                null
-        );
+        BalanceResponse response = bankStatementService.calculateBalance("LT100001", null, null);
 
         assertEquals("LT100001", response.accountNumber());
-        assertEquals(0, response.balance().compareTo(new BigDecimal("10.00")));
-        assertEquals("EUR", response.currency());
+        assertNotNull(response.balances());
+        assertTrue(response.balances().isEmpty());
     }
 
     @Test

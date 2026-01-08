@@ -1,6 +1,7 @@
 package lt.daiva.bankstatement.controller;
 
 import lt.daiva.bankstatement.dto.BalanceResponse;
+import lt.daiva.bankstatement.dto.CurrencyBalance;
 import lt.daiva.bankstatement.service.BankStatementService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +12,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -41,15 +43,17 @@ class BankStatementControllerTest {
     @Test
     void shouldReturnBalance_whenRequestIsValid() throws Exception {
         when(service.calculateBalance(eq("LT100001"), any(), any()))
-                .thenReturn(new BalanceResponse("LT100001", new BigDecimal("10.00"), "EUR"));
+                .thenReturn(new BalanceResponse("LT100001",
+                        List.of(new CurrencyBalance("EUR", new BigDecimal("10.00")))));
 
         mockMvc.perform(get("/api/v1/statements/accounts/LT100001/balance")
                         .param("from", "2025-01-01T00:00:00")
                         .param("to", "2025-01-31T23:59:59"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.balances.length()").value(1))
                 .andExpect(jsonPath("$.accountNumber").value("LT100001"))
-                .andExpect(jsonPath("$.balance").value(10.00))
-                .andExpect(jsonPath("$.currency").value("EUR"));
+                .andExpect(jsonPath("$.balances[0].amount").value(10.00))
+                .andExpect(jsonPath("$.balances[0].currency").value("EUR"));
     }
 
     @Test

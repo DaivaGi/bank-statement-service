@@ -1,5 +1,6 @@
 package lt.daiva.bankstatement.repository;
 
+import lt.daiva.bankstatement.dto.CurrencyBalance;
 import lt.daiva.bankstatement.model.BankOperation;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -36,6 +37,20 @@ public interface BankOperationRepository extends JpaRepository<BankOperation, Lo
             """)
     List<BankOperation> findForExport(
             @Param("accounts") List<String> accounts,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    @Query("""
+                select b.currency, sum(b.amount)
+                from BankOperation b
+                where b.accountNumber = :accountNumber
+                  and (:from is null or b.operationTime >= :from)
+                  and (:to   is null or b.operationTime <= :to)
+                group by b.currency
+            """)
+    List<CurrencyBalance> calculateBalancesByCurrency(
+            @Param("accountNumber") String accountNumber,
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to
     );

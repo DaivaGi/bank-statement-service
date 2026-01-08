@@ -1,6 +1,7 @@
 package lt.daiva.bankstatement.service;
 
 import lt.daiva.bankstatement.dto.BalanceResponse;
+import lt.daiva.bankstatement.dto.CurrencyBalance;
 import lt.daiva.bankstatement.dto.ExportResult;
 import lt.daiva.bankstatement.exception.BankStatementException;
 import lt.daiva.bankstatement.model.BankOperation;
@@ -80,11 +81,9 @@ public class BankStatementService {
                                             LocalDateTime from,
                                             LocalDateTime to) {
         validateDateRange(from, to);
-        BigDecimal balance = Optional
-                .ofNullable(bankOperationRepository.calculateBalance(accountNumber, from, to))
-                .orElse(BigDecimal.ZERO);
+        var balances = bankOperationRepository.calculateBalancesByCurrency(accountNumber, from, to);
 
-        return new BalanceResponse(accountNumber, balance, "EUR");
+        return new BalanceResponse(accountNumber, balances);
     }
 
     public ExportResult exportToCsv(List<String> accounts, LocalDateTime from, LocalDateTime to) {

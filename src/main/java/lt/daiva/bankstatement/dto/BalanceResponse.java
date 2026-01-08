@@ -1,8 +1,6 @@
 package lt.daiva.bankstatement.dto;
 
-import java.math.BigDecimal;
+import java.util.List;
 
-public record BalanceResponse(String accountNumber,
-                              BigDecimal balance,
-                              String currency) {
+public record BalanceResponse(String accountNumber, List<CurrencyBalance> balances) {
 }
