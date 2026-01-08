@@ -1,0 +1,74 @@
+package lt.daiva.bankstatement.controller;
+
+import lt.daiva.bankstatement.dto.BalanceResponse;
+import lt.daiva.bankstatement.service.BankStatementService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.math.BigDecimal;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+class BankStatementControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockitoBean
+    BankStatementService service;
+
+    @Test
+    void shouldReturn400WhenDateFormatIsInvalid() throws Exception {
+        mockMvc.perform(get("/api/v1/statements/accounts/LT1/balance")
+                        .param("from", "2025-01-02"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+    }
+
+    @Test
+    void shouldReturnBalance_whenRequestIsValid() throws Exception {
+        when(service.calculateBalance(eq("LT100001"), any(), any()))
+                .thenReturn(new BalanceResponse("LT100001", new BigDecimal("10.00"), "EUR"));
+
+        mockMvc.perform(get("/api/v1/statements/accounts/LT100001/balance")
+                        .param("from", "2025-01-01T00:00:00")
+                        .param("to", "2025-01-31T23:59:59"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accountNumber").value("LT100001"))
+                .andExpect(jsonPath("$.balance").value(10.00))
+                .andExpect(jsonPath("$.currency").value("EUR"));
+    }
+
+    @Test
+    void shouldReturn400_whenDateFormatIsInvalid() throws Exception {
+        mockMvc.perform(get("/api/v1/statements/accounts/LT1/balance")
+                        .param("from", "2025-01-02"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturn400_whenImportingNonCsvFile() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "data.txt",
+                "application/octet-stream",
+                "not a csv".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/v1/statements/import").file(file))
+                .andExpect(status().isBadRequest());
+    }
+}

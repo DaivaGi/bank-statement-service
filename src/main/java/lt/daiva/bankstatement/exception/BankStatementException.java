@@ -1,6 +1,6 @@
 package lt.daiva.bankstatement.exception;
 
-public class BankStatementException extends RuntimeException{
+public class BankStatementException extends RuntimeException {
     public BankStatementException(String message) {
         super(message);
     }

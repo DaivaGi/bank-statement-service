@@ -1,0 +1,171 @@
+package lt.daiva.bankstatement.service;
+
+import lt.daiva.bankstatement.dto.BalanceResponse;
+import lt.daiva.bankstatement.dto.ExportResult;
+import lt.daiva.bankstatement.exception.BankStatementException;
+import lt.daiva.bankstatement.model.BankOperation;
+import lt.daiva.bankstatement.repository.BankOperationRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
+
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class BankStatementServiceUnitTest {
+
+    @Mock
+    private BankOperationRepository bankOperationRepository;
+
+    @InjectMocks
+    private BankStatementService bankStatementService;
+
+    @Test
+    void calculateBalance_shouldThrow_whenFromIsAfterTo() {
+        LocalDateTime from = LocalDateTime.parse("2025-01-10T00:00:00");
+        LocalDateTime to = LocalDateTime.parse("2025-01-01T00:00:00");
+
+        BankStatementException ex = assertThrows(
+                BankStatementException.class,
+                () -> bankStatementService.calculateBalance("LT100001", from, to)
+        );
+
+        assertTrue(ex.getMessage().toLowerCase().contains("invalid date range"));
+        verifyNoInteractions(bankOperationRepository);
+    }
+
+    @Test
+    void calculateBalance_shouldReturnZero_whenRepositoryReturnsNull() {
+        when(bankOperationRepository.calculateBalance(eq("LT100001"), any(), any()))
+                .thenReturn(null);
+
+        BalanceResponse response = bankStatementService.calculateBalance(
+                "LT100001",
+                LocalDateTime.parse("2025-01-01T00:00:00"),
+                LocalDateTime.parse("2025-01-31T23:59:59")
+        );
+
+        assertEquals("LT100001", response.accountNumber());
+        assertEquals(0, response.balance().compareTo(new BigDecimal("0.00")));
+        assertEquals("EUR", response.currency());
+
+        verify(bankOperationRepository).calculateBalance(eq("LT100001"), any(), any());
+    }
+
+    @Test
+    void calculateBalance_shouldReturnRepositorySum() {
+        when(bankOperationRepository.calculateBalance(eq("LT100001"), any(), any()))
+                .thenReturn(new BigDecimal("10.00"));
+
+        BalanceResponse response = bankStatementService.calculateBalance(
+                "LT100001",
+                null,
+                null
+        );
+
+        assertEquals("LT100001", response.accountNumber());
+        assertEquals(0, response.balance().compareTo(new BigDecimal("10.00")));
+        assertEquals("EUR", response.currency());
+    }
+
+    @Test
+    void importFromCsv_shouldSaveOperations_andReturnCount() {
+        String csv = """
+                accountNumber,operationDateTime,beneficiary,comment,amount,currency
+                LT100001,2025-01-01T09:15:00,Employer,January salary,1500.00,EUR
+                LT100001,2025-01-03T18:40:00,Maxima,Groceries,85.32,EUR
+                """;
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "sample.csv",
+                "text/csv",
+                csv.getBytes()
+        );
+
+        int imported = bankStatementService.importFromCsv(file);
+
+        assertEquals(2, imported);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<BankOperation>> captor = ArgumentCaptor.forClass(List.class);
+        verify(bankOperationRepository).saveAll(captor.capture());
+
+        var ops = captor.getValue();
+        assertEquals(2, ops.size());
+
+        var op1 = ops.getFirst();
+        assertEquals("LT100001", op1.getAccountNumber());
+        assertEquals(LocalDateTime.parse("2025-01-01T09:15:00"), op1.getOperationTime());
+        assertEquals("Employer", op1.getBeneficiary());
+        assertEquals("January salary", op1.getOperationComment());
+        assertEquals(0, op1.getAmount().compareTo(new BigDecimal("1500.00")));
+        assertEquals("EUR", op1.getCurrency());
+    }
+
+    @Test
+    void importFromCsv_shouldThrow_whenMissingRequiredHeader() {
+        String csvMissingComment = """
+                accountNumber,operationDateTime,beneficiary,amount,currency
+                LT100001,2025-01-01T09:15:00,Employer,1500.00,EUR
+                """;
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "missing-column.csv",
+                "text/csv",
+                csvMissingComment.getBytes()
+        );
+
+        BankStatementException ex = assertThrows(
+                BankStatementException.class,
+                () -> bankStatementService.importFromCsv(file)
+        );
+
+        assertTrue(ex.getMessage().toLowerCase().contains("missing"));
+        assertTrue(ex.getMessage().toLowerCase().contains("comment"));
+
+        verifyNoInteractions(bankOperationRepository);
+    }
+
+    @Test
+    void exportToCsv_shouldReturnCsvWithHeaderAndRows_andTotalCount() {
+        List<BankOperation> ops = List.of(
+                new BankOperation("LT100001", LocalDateTime.parse("2025-01-01T09:15:00"),
+                        "Employer", "Salary", new BigDecimal("1500.00"), "EUR"),
+                new BankOperation("LT100001", LocalDateTime.parse("2025-01-03T18:40:00"),
+                        "Maxima", "Groceries", new BigDecimal("85.32"), "EUR")
+        );
+
+        when(bankOperationRepository.findForExport(anyList(), any(), any())).thenReturn(ops);
+
+        ExportResult result = bankStatementService.exportToCsv(
+                List.of("LT100001"),
+                LocalDateTime.parse("2025-01-01T00:00:00"),
+                LocalDateTime.parse("2025-01-31T23:59:59")
+        );
+
+        assertEquals(2, result.totalRecords());
+
+        String csv = new String(result.csv(), StandardCharsets.UTF_8);
+        assertTrue(csv.contains("accountNumber,operationDateTime,beneficiary,comment,amount,currency"));
+        assertTrue(csv.contains("LT100001"));
+        assertTrue(csv.contains("Employer"));
+        assertTrue(csv.contains("Maxima"));
+    }
+}
