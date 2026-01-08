@@ -71,7 +71,6 @@ public class BankOperation {
         return amount;
     }
 
-
     public String getCurrency() {
         return currency;
     }

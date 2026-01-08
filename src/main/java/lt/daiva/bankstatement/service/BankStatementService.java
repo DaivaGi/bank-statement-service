@@ -1,15 +1,19 @@
 package lt.daiva.bankstatement.service;
 
 import lt.daiva.bankstatement.dto.BalanceResponse;
+import lt.daiva.bankstatement.dto.ExportResult;
+import lt.daiva.bankstatement.exception.BankStatementException;
 import lt.daiva.bankstatement.model.BankOperation;
 import lt.daiva.bankstatement.repository.BankOperationRepository;
 import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.csv.CSVRecord;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.math.BigDecimal;
@@ -22,10 +26,13 @@ import java.util.Optional;
 @Service
 public class BankStatementService {
 
-    private final BankOperationRepository repository;
+    private final BankOperationRepository bankOperationRepository;
+    private static final List<String> REQUIRED_HEADERS = List.of(
+            "accountNumber", "operationDateTime", "beneficiary", "comment", "amount", "currency"
+    );
 
-    public BankStatementService(BankOperationRepository repository) {
-        this.repository = repository;
+    public BankStatementService(BankOperationRepository bankOperationRepository) {
+        this.bankOperationRepository = bankOperationRepository;
     }
 
     /**
@@ -42,43 +49,54 @@ public class BankStatementService {
                     .setTrim(true)
                     .build();
 
-            Iterable<CSVRecord> records = format.parse(reader);
+            try (CSVParser parser = format.parse(reader)) {
+                validateHeaders(parser);
 
-            List<BankOperation> operations = new ArrayList<>();
+                List<BankOperation> operations = new ArrayList<>();
 
-            for (CSVRecord record : records) {
-                BankOperation op = new BankOperation(
-                        record.get("accountNumber"),
-                        LocalDateTime.parse(record.get("operationDateTime")),
-                        record.get("beneficiary"),
-                        record.get("comment"),
-                        new BigDecimal(record.get("amount")),
-                        record.get("currency").toUpperCase()
-                );
-                operations.add(op);
+                for (CSVRecord record : parser) {
+                    BankOperation operation = new BankOperation(
+                            record.get("accountNumber"),
+                            LocalDateTime.parse(record.get("operationDateTime")),
+                            record.get("beneficiary"),
+                            record.get("comment"),
+                            new BigDecimal(record.get("amount")),
+                            record.get("currency").toUpperCase()
+                    );
+                    operations.add(operation);
+                }
+                bankOperationRepository.saveAll(operations);
+                return operations.size();
             }
 
-            repository.saveAll(operations);
-            return operations.size();
-
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to import CSV file", e);
+        } catch (IllegalArgumentException e) {
+            throw new BankStatementException("Invalid CSV format: missing required header or invalid file content");
+        } catch (IOException e) {
+            throw new BankStatementException("Failed to read uploaded file");
         }
     }
 
     public BalanceResponse calculateBalance(String accountNumber,
                                             LocalDateTime from,
                                             LocalDateTime to) {
+        validateDateRange(from, to);
         BigDecimal balance = Optional
-                .ofNullable(repository.calculateBalance(accountNumber, from, to))
+                .ofNullable(bankOperationRepository.calculateBalance(accountNumber, from, to))
                 .orElse(BigDecimal.ZERO);
 
         return new BalanceResponse(accountNumber, balance, "EUR");
     }
 
-    public byte[] exportToCsv(List<String> accounts, LocalDateTime from, LocalDateTime to) {
-        var ops = repository.findForExport(accounts, from, to);
+    public ExportResult exportToCsv(List<String> accounts, LocalDateTime from, LocalDateTime to) {
+        validateDateRange(from, to);
 
+        var operations = bankOperationRepository.findForExport(accounts, from, to);
+        var csv = generateCsv(operations);
+
+        return new ExportResult(csv, operations.size());
+    }
+
+    private byte[] generateCsv(List<BankOperation> operations) {
         try (var out = new ByteArrayOutputStream();
              var writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
              var printer = new CSVPrinter(writer, CSVFormat.DEFAULT.builder()
@@ -86,14 +104,14 @@ public class BankStatementService {
                      .build()
              )) {
 
-            for (var op : ops) {
+            for (var operation : operations) {
                 printer.printRecord(
-                        op.getAccountNumber(),
-                        op.getOperationTime(),
-                        op.getBeneficiary(),
-                        op.getOperationComment(),
-                        op.getAmount(),
-                        op.getCurrency()
+                        operation.getAccountNumber(),
+                        operation.getOperationTime(),
+                        operation.getBeneficiary(),
+                        operation.getOperationComment(),
+                        operation.getAmount(),
+                        operation.getCurrency()
                 );
             }
 
@@ -102,6 +120,22 @@ public class BankStatementService {
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to export CSV", e);
+        }
+
+    }
+
+    private static void validateDateRange(LocalDateTime from, LocalDateTime to) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw BankStatementException.invalidDateRange();
+        }
+    }
+
+    private void validateHeaders(CSVParser parser) {
+        var headerMap = parser.getHeaderMap();
+        for (String header : REQUIRED_HEADERS) {
+            if (!headerMap.containsKey(header)) {
+                throw BankStatementException.missingRequiredColumn(header);
+            }
         }
     }
 }

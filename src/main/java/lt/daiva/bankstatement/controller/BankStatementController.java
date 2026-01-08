@@ -3,6 +3,8 @@ package lt.daiva.bankstatement.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import lt.daiva.bankstatement.dto.BalanceResponse;
+import lt.daiva.bankstatement.dto.ExportResult;
+import lt.daiva.bankstatement.exception.BankStatementException;
 import lt.daiva.bankstatement.service.BankStatementService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
@@ -21,15 +23,16 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/v1/statements")
 public class BankStatementController {
 
-    private final BankStatementService service;
+    private final BankStatementService bankStatementService;
 
-    public BankStatementController(BankStatementService service) {
-        this.service = service;
+    public BankStatementController(BankStatementService bankStatementService) {
+        this.bankStatementService = bankStatementService;
     }
 
     @PostMapping(value = "/import", consumes = "multipart/form-data")
@@ -45,7 +48,11 @@ public class BankStatementController {
                     """
     )
     public ResponseEntity<Map<String, Integer>> importCsv(@RequestPart("file") MultipartFile file) {
-        int imported = service.importFromCsv(file);
+        if (!isCsv(file)) {
+            throw new BankStatementException("Only CSV files are supported");
+        }
+        int imported = bankStatementService.importFromCsv(file);
+
         return ResponseEntity.ok(Map.of("imported", imported));
     }
 
@@ -64,10 +71,11 @@ public class BankStatementController {
                     description = "End date-time in ISO format",
                     example = "2025-01-05T23:59:59")
             LocalDateTime to) {
-        return service.calculateBalance(accountNumber, from, to);
+
+        return bankStatementService.calculateBalance(accountNumber, from, to);
     }
 
-    @GetMapping(value = "/export", produces = "text/csv")
+    @GetMapping(value = "/export")
     @Operation(
             summary = "Export bank statement to CSV",
             description = "Exports operations for one or several accounts. Optional date range filters are ISO date-time."
@@ -87,7 +95,7 @@ public class BankStatementController {
             @Parameter(description = "End date-time (ISO)", example = "2025-01-05T23:59:59")
             LocalDateTime to
     ) {
-        byte[] csv = service.exportToCsv(accounts, from, to);
+        ExportResult result = bankStatementService.exportToCsv(accounts, from, to);
 
         String filename = "bank-statement-"
                 + LocalDateTime.now()
@@ -95,9 +103,24 @@ public class BankStatementController {
                 + ".csv";
 
         return ResponseEntity.ok()
+                .header("X-Total-Records", String.valueOf(result.totalRecords()))
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=filename=\"" + filename + "\"")
                 .contentType(MediaType.parseMediaType("text/csv"))
-                .body(csv);
+                .body(result.csv());
+    }
+
+    private static boolean isCsv(MultipartFile file) {
+        String name = Objects.toString(file.getOriginalFilename(), "");
+        String contentType = Objects.toString(file.getContentType(), "");
+
+        boolean csvByName = name.toLowerCase().endsWith(".csv");
+        boolean csvByType =
+                contentType.equals("text/csv") ||
+                        contentType.equals("application/csv") ||
+                        contentType.equals("application/vnd.ms-excel") ||
+                        contentType.startsWith("text/");
+
+        return csvByName || csvByType;
     }
 }

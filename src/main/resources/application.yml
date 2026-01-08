@@ -19,6 +19,11 @@ spring:
   flyway:
     enabled: true
 
+  server:
+    error:
+      include-stacktrace: never
+      include-message: always
+
   servlet:
     multipart:
       max-file-size: 2MB
