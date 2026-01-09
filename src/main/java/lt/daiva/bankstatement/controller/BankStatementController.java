@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import lt.daiva.bankstatement.dto.BalanceResponse;
 import lt.daiva.bankstatement.dto.ExportResult;
+import lt.daiva.bankstatement.dto.ImportResult;
 import lt.daiva.bankstatement.exception.BankStatementException;
 import lt.daiva.bankstatement.service.BankStatementService;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -19,10 +20,10 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 @RestController
@@ -44,33 +45,35 @@ public class BankStatementController {
                     accountNumber,operationDateTime,beneficiary,comment,amount,currency
 
                     Example:
-                    LT100001,2025-01-01T09:15:00,Employer,January salary,1500.00,EUR
+                    LT100001,2025-01-05T12:10:00,Upwork	Freelance payment,200.00,EUR
                     """
     )
-    public ResponseEntity<Map<String, Integer>> importCsv(@RequestPart("file") MultipartFile file) {
+    public ResponseEntity<ImportResult> importCsv(@RequestPart("file") MultipartFile file) {
         if (!isCsv(file)) {
             throw new BankStatementException("Only CSV files are supported");
         }
-        int imported = bankStatementService.importFromCsv(file);
 
-        return ResponseEntity.ok(Map.of("imported", imported));
+        ImportResult result = bankStatementService.importFromCsv(file);
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/accounts/{accountNumber}/balance")
     public BalanceResponse getBalance(
-            @PathVariable String accountNumber,
+            @PathVariable
+            @Parameter(description = "Account number", example = "LT100001")
+            String accountNumber,
             @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             @Parameter(
-                    description = "Start date-time in ISO format",
-                    example = "2025-01-02T00:00:00")
-            LocalDateTime from,
+                    description = "Start date",
+                    example = "2025-01-02")
+            LocalDate from,
             @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             @Parameter(
-                    description = "End date-time in ISO format",
-                    example = "2025-01-05T23:59:59")
-            LocalDateTime to) {
+                    description = "End date",
+                    example = "2025-01-05")
+            LocalDate to) {
 
         return bankStatementService.calculateBalance(accountNumber, from, to);
     }
@@ -78,7 +81,7 @@ public class BankStatementController {
     @GetMapping(value = "/export")
     @Operation(
             summary = "Export bank statement to CSV",
-            description = "Exports operations for one or several accounts. Optional date range filters are ISO date-time."
+            description = "Exports operations for one or several accounts. Optional date range filters."
     )
     public ResponseEntity<byte[]> exportCsv(
             @RequestParam
@@ -86,14 +89,14 @@ public class BankStatementController {
             List<String> accounts,
 
             @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            @Parameter(description = "Start date-time (ISO)", example = "2025-01-02T00:00:00")
-            LocalDateTime from,
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            @Parameter(description = "Start date", example = "2025-01-02")
+            LocalDate from,
 
             @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            @Parameter(description = "End date-time (ISO)", example = "2025-01-05T23:59:59")
-            LocalDateTime to
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            @Parameter(description = "End date", example = "2025-01-05")
+            LocalDate to
     ) {
         ExportResult result = bankStatementService.exportToCsv(accounts, from, to);
 

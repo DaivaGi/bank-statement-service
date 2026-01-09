@@ -12,10 +12,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -23,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -38,8 +41,8 @@ class BankStatementServiceUnitTest {
 
     @Test
     void calculateBalance_shouldThrow_whenFromIsAfterTo() {
-        LocalDateTime from = LocalDateTime.parse("2025-01-10T00:00:00");
-        LocalDateTime to = LocalDateTime.parse("2025-01-01T00:00:00");
+        LocalDate from = LocalDate.parse("2025-01-10");
+        LocalDate to = LocalDate.parse("2025-01-01");
 
         BankStatementException ex = assertThrows(
                 BankStatementException.class,
@@ -82,6 +85,7 @@ class BankStatementServiceUnitTest {
                 accountNumber,operationDateTime,beneficiary,comment,amount,currency
                 LT100001,2025-01-01T09:15:00,Employer,January salary,1500.00,EUR
                 LT100001,2025-01-03T18:40:00,Maxima,Groceries,85.32,EUR
+                LT100001,2025-01-03T18:40:00,Maxima,Groceries,85.32,EUR
                 """;
 
         MockMultipartFile file = new MockMultipartFile(
@@ -91,16 +95,21 @@ class BankStatementServiceUnitTest {
                 csv.getBytes()
         );
 
-        int imported = bankStatementService.importFromCsv(file);
+        when(bankOperationRepository.save(any(BankOperation.class)))
+                .thenReturn(null)
+                .thenReturn(null)
+                .thenThrow(new DataIntegrityViolationException("duplicate"));
 
-        assertEquals(2, imported);
+        var result = bankStatementService.importFromCsv(file);
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<BankOperation>> captor = ArgumentCaptor.forClass(List.class);
-        verify(bankOperationRepository).saveAll(captor.capture());
+        assertEquals(2, result.imported());
+        assertEquals(1, result.skippedDuplicates());
 
-        var ops = captor.getValue();
-        assertEquals(2, ops.size());
+        ArgumentCaptor<BankOperation> captor = ArgumentCaptor.forClass(BankOperation.class);
+        verify(bankOperationRepository, times(3)).save(captor.capture());
+
+        var ops = captor.getAllValues();
+        assertEquals(3, ops.size());
 
         var op1 = ops.getFirst();
         assertEquals("LT100001", op1.getAccountNumber());
@@ -149,8 +158,8 @@ class BankStatementServiceUnitTest {
 
         ExportResult result = bankStatementService.exportToCsv(
                 List.of("LT100001"),
-                LocalDateTime.parse("2025-01-01T00:00:00"),
-                LocalDateTime.parse("2025-01-31T23:59:59")
+                LocalDate.parse("2025-01-01"),
+                LocalDate.parse("2025-01-31")
         );
 
         assertEquals(2, result.totalRecords());

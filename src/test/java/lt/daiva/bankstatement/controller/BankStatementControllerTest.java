@@ -35,7 +35,7 @@ class BankStatementControllerTest {
     @Test
     void shouldReturn400WhenDateFormatIsInvalid() throws Exception {
         mockMvc.perform(get("/api/v1/statements/accounts/LT1/balance")
-                        .param("from", "2025-01-02"))
+                        .param("from", "2025-01-02T09:15:00"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
     }
@@ -47,8 +47,8 @@ class BankStatementControllerTest {
                         List.of(new CurrencyBalance("EUR", new BigDecimal("10.00")))));
 
         mockMvc.perform(get("/api/v1/statements/accounts/LT100001/balance")
-                        .param("from", "2025-01-01T00:00:00")
-                        .param("to", "2025-01-31T23:59:59"))
+                        .param("from", "2025-01-01")
+                        .param("to", "2025-01-31"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.balances.length()").value(1))
                 .andExpect(jsonPath("$.accountNumber").value("LT100001"))
@@ -59,7 +59,7 @@ class BankStatementControllerTest {
     @Test
     void shouldReturn400_whenDateFormatIsInvalid() throws Exception {
         mockMvc.perform(get("/api/v1/statements/accounts/LT1/balance")
-                        .param("from", "2025-01-02"))
+                        .param("from", "2025-01-02T09:15:00"))
                 .andExpect(status().isBadRequest());
     }
 

@@ -8,7 +8,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -24,8 +24,8 @@ class BankStatementServiceTest {
 
     @Test
     void shouldThrowExceptionWhenFromIsAfterTo() {
-        LocalDateTime from = LocalDateTime.parse("2025-01-10T00:00:00");
-        LocalDateTime to = LocalDateTime.parse("2025-01-01T00:00:00");
+        LocalDate from = LocalDate.parse("2025-01-10");
+        LocalDate to = LocalDate.parse("2025-01-01");
 
         BankStatementException ex = assertThrows(
                 BankStatementException.class,

@@ -27,7 +27,7 @@ public class GlobalExceptionHandler {
                 "Invalid value for ''{0}'': {1}. Expected format: {2}",
                 param,
                 value,
-                "yyyy-MM-dd'T'HH:mm:ss");
+                "yyyy-MM-dd");
 
         return ResponseEntity.badRequest()
                 .body(new ApiError("INVALID_PARAMETER", message));

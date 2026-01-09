@@ -38,14 +38,16 @@ class BankOperationRepositoryTest {
         entityManager.flush();
 
         // when
-        BigDecimal result = repository.calculateBalance(
+        var result = repository.calculateBalancesByCurrency(
                 "LT1",
                 LocalDateTime.parse("2025-01-02T00:00:00"),
                 LocalDateTime.parse("2025-01-09T23:59:59")
         );
 
         // then
-        assertEquals(0, result.compareTo(new BigDecimal("50")));
+        assertEquals(1, result.size());
+        assertEquals("EUR", result.getFirst().currency());
+        assertEquals(0, result.getFirst().amount().compareTo(new BigDecimal("50")));
     }
 
     @Test
@@ -58,13 +60,15 @@ class BankOperationRepositoryTest {
         entityManager.flush();
 
         // when
-        BigDecimal result = repository.calculateBalance(
+        var result = repository.calculateBalancesByCurrency(
                 "LT2",
                 LocalDateTime.parse("2025-01-02T00:00:00"),
                 LocalDateTime.parse("2025-01-02T00:00:00")
         );
 
         // then
-        assertEquals(0, result.compareTo(new BigDecimal("10")));
+        assertEquals(1, result.size());
+        assertEquals("EUR", result.getFirst().currency());
+        assertEquals(0, result.getFirst().amount().compareTo(new BigDecimal("10")));
     }
 }
