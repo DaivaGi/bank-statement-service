@@ -4,6 +4,7 @@ import lt.daiva.bankstatement.dto.BalanceResponse;
 import lt.daiva.bankstatement.dto.ExportResult;
 import lt.daiva.bankstatement.dto.ImportResult;
 import lt.daiva.bankstatement.exception.BankStatementException;
+import lt.daiva.bankstatement.exception.InvalidCsvRecordException;
 import lt.daiva.bankstatement.model.BankOperation;
 import lt.daiva.bankstatement.repository.BankOperationRepository;
 import org.apache.commons.csv.CSVFormat;
@@ -23,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 @Service
@@ -67,17 +69,20 @@ public class BankStatementService {
                         imported++;
 
                     } catch (DataIntegrityViolationException e) {
-                        skipped++;
+                        if (isDuplicateKeyViolation(e)) {
+                            skipped++;
+                        } else {
+                            throw e;
+                        }
                     }
                 }
 
                 return new ImportResult(imported, skipped);
             }
-
         } catch (IllegalArgumentException e) {
             throw new BankStatementException("Invalid CSV format: missing required header or invalid file content");
         } catch (IOException e) {
-            throw new BankStatementException("Failed to read uploaded file");
+            throw new BankStatementException("Failed to read uploaded file: " + e.getMessage());
         }
     }
 
@@ -125,18 +130,29 @@ public class BankStatementService {
     }
 
     private BankOperation toOperation(CSVRecord record) {
-        var operationComment = record.get("comment");
-        if (operationComment == null) {
-            operationComment = "";
+        try {
+            var operationComment = record.get("comment");
+            if (operationComment == null) {
+                operationComment = "";
+            }
+            return new BankOperation(
+                    record.get("accountNumber"),
+                    LocalDateTime.parse(record.get("operationDateTime")),
+                    record.get("beneficiary"),
+                    operationComment,
+                    new BigDecimal(record.get("amount")),
+                    record.get("currency").trim().toUpperCase()
+            );
+
+        } catch (DateTimeParseException e) {
+            throw new InvalidCsvRecordException(
+                    "Invalid date format for operationDateTime: " + record.get("operationDateTime")
+            );
+        } catch (NumberFormatException e) {
+            throw new InvalidCsvRecordException(
+                    "Invalid amount: " + record.get("amount")
+            );
         }
-        return new BankOperation(
-                record.get("accountNumber"),
-                LocalDateTime.parse(record.get("operationDateTime")),
-                record.get("beneficiary"),
-                operationComment,
-                new BigDecimal(record.get("amount")),
-                record.get("currency").trim().toUpperCase()
-        );
     }
 
     private byte[] generateCsv(List<BankOperation> operations) {
@@ -160,8 +176,8 @@ public class BankStatementService {
             printer.flush();
             return out.toByteArray();
 
-        } catch (Exception e) {
-            throw new BankStatementException("Failed to export CSV");
+        } catch (IOException e) {
+            throw new BankStatementException("Failed to export CSV: " + e.getMessage());
         }
     }
 
@@ -182,5 +198,10 @@ public class BankStatementService {
                 throw BankStatementException.missingRequiredColumn(header);
             }
         }
+    }
+
+    private Boolean isDuplicateKeyViolation(DataIntegrityViolationException e) {
+        String msg = String.valueOf(e.getMostSpecificCause().getMessage()).toLowerCase();
+        return msg.contains("uq_bank_operation_unique");
     }
 }

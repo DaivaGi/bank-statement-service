@@ -98,7 +98,7 @@ class BankStatementServiceUnitTest {
         when(bankOperationRepository.save(any(BankOperation.class)))
                 .thenReturn(null)
                 .thenReturn(null)
-                .thenThrow(new DataIntegrityViolationException("duplicate"));
+                .thenThrow(new DataIntegrityViolationException("uq_bank_operation_unique"));
 
         var result = bankStatementService.importFromCsv(file);
 

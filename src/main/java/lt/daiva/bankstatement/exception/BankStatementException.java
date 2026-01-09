@@ -5,6 +5,10 @@ public class BankStatementException extends RuntimeException {
         super(message);
     }
 
+    public BankStatementException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
     public static BankStatementException invalidDateRange() {
         return new BankStatementException("Invalid date range: 'from' is after 'to'");
     }

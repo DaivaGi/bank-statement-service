@@ -97,6 +97,7 @@ curl -X GET "http://localhost:8080/api/v1/statements/accounts/LT100001/balance?f
 Example CSV files are available in the `samples/` folder: 
 - `import-sample.csv`\
 - `import-missing-header.csv`\
+- `import-invalid-date.csv`\
 - `import-multi-currency.csv`
 
 ------------------------------------------------------------------------

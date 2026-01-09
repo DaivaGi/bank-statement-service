@@ -32,4 +32,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest()
                 .body(new ApiError("INVALID_PARAMETER", message));
     }
+
+    @ExceptionHandler(InvalidCsvRecordException.class)
+    public ResponseEntity<ApiError> handleInvalidCsvRecord(InvalidCsvRecordException e) {
+        return ResponseEntity.badRequest()
+                .body(new ApiError("INVALID_CSV_RECORD", e.getMessage()));
+    }
 }
