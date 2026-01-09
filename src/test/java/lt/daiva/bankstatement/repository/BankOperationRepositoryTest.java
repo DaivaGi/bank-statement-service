@@ -21,7 +21,7 @@ class BankOperationRepositoryTest {
     private TestEntityManager entityManager;
 
     @Test
-    void shouldCalculateBalanceWithinDateRange() {
+    void shouldCalculateBalanceForDifferentDateRange() {
         // given
         entityManager.persist(new BankOperation("LT1",
                 LocalDateTime.parse("2025-01-01T10:00:00"),
@@ -38,16 +38,26 @@ class BankOperationRepositoryTest {
         entityManager.flush();
 
         // when
-        var result = repository.calculateBalancesByCurrency(
+        var resultFirstRange = repository.calculateBalancesByCurrency(
                 "LT1",
                 LocalDateTime.parse("2025-01-02T00:00:00"),
                 LocalDateTime.parse("2025-01-09T23:59:59")
         );
 
         // then
-        assertEquals(1, result.size());
-        assertEquals("EUR", result.getFirst().currency());
-        assertEquals(0, result.getFirst().amount().compareTo(new BigDecimal("50")));
+        assertEquals(1, resultFirstRange.size());
+        assertEquals("EUR", resultFirstRange.getFirst().currency());
+        assertEquals(0, resultFirstRange.getFirst().amount().compareTo(new BigDecimal("50")));
+
+        var resultSecondRange = repository.calculateBalancesByCurrency(
+                "LT1",
+                LocalDateTime.parse("2025-01-01T00:00:00"),
+                LocalDateTime.parse("2025-01-10T23:59:59")
+        );
+
+        assertEquals(1, resultSecondRange.size());
+        assertEquals("EUR", resultSecondRange.getFirst().currency());
+        assertEquals(0, resultSecondRange.getFirst().amount().compareTo(new BigDecimal("175")));
     }
 
     @Test

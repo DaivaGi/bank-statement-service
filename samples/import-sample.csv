@@ -1,0 +1,6 @@
+accountNumber,operationDateTime,beneficiary,comment,amount,currency
+LT100001,2025-01-01T09:15:00,Employer,January salary,1500.0,EUR
+LT100001,2025-01-03T18:40:00,Maxima,Groceries,85.32,EUR
+LT100001,2025-01-05T12:10:00,Telia,Mobile plan,19.99,EUR
+LT200002,2025-01-02T08:30:00,Swedbank,Loan payment,-250.0,EUR
+LT200002,2025-01-04T20:00:00,Netflix,Monthly subscription,-15.99,EUR

@@ -45,9 +45,11 @@ public class BankStatementService {
     }
 
     /**
-     * Imports bank operations from CSV file.
-     * Expected header:
-     * accountNumber,operationDateTime,beneficiary,comment,amount,currency
+     * Parses CSV file, validates required headers and values,
+     * skips duplicate operations and persists valid records.
+     *
+     * @param file CSV file with bank operations
+     * @return result containing number of imported and skipped records
      */
     public ImportResult importFromCsv(MultipartFile file) {
         int imported = 0;
@@ -79,24 +81,42 @@ public class BankStatementService {
         }
     }
 
+    /**
+     * Calculates account balance for a given date range.
+     *
+     * @param accountNumber account identifier
+     * @param from          optional start date (inclusive)
+     * @param to            optional end date (inclusive)
+     * @return balance grouped by currency
+     */
     public BalanceResponse calculateBalance(String accountNumber,
                                             LocalDate from,
                                             LocalDate to) {
         validateDateRange(from, to);
 
         LocalDateTime fromDatetime = (from == null) ? null : from.atTime(START_OF_DAY);
-        LocalDateTime toDatetime   = (to   == null) ? null : to.atTime(END_OF_DAY);
+        LocalDateTime toDatetime = (to == null) ? null : to.atTime(END_OF_DAY);
 
         var balances = bankOperationRepository.calculateBalancesByCurrency(accountNumber, fromDatetime, toDatetime);
 
         return new BalanceResponse(accountNumber, balances);
     }
 
+    /**
+     * Exports bank operations for one or several accounts.
+     * Date filters are provided as LocalDate and converted internally
+     * to day boundaries (start/end of day).
+     *
+     * @param accounts list of account numbers to export
+     * @param from     optional start date (inclusive)
+     * @param to       optional end date (inclusive)
+     * @return CSV file content and metadata
+     */
     public ExportResult exportToCsv(List<String> accounts, LocalDate from, LocalDate to) {
         validateDateRange(from, to);
 
         LocalDateTime fromDatetime = (from == null) ? null : from.atTime(START_OF_DAY);
-        LocalDateTime toDatetime   = (to   == null) ? null : to.atTime(END_OF_DAY);
+        LocalDateTime toDatetime = (to == null) ? null : to.atTime(END_OF_DAY);
 
         var operations = bankOperationRepository.findForExport(accounts, fromDatetime, toDatetime);
         var csv = generateCsv(operations);
@@ -124,8 +144,7 @@ public class BankStatementService {
              var writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
              var printer = new CSVPrinter(writer, CSVFormat.DEFAULT.builder()
                      .setHeader("accountNumber", "operationDateTime", "beneficiary", "comment", "amount", "currency")
-                     .build()
-             )) {
+                     .build())) {
 
             for (var operation : operations) {
                 printer.printRecord(
@@ -142,11 +161,14 @@ public class BankStatementService {
             return out.toByteArray();
 
         } catch (Exception e) {
-            throw new RuntimeException("Failed to export CSV", e);
+            throw new BankStatementException("Failed to export CSV");
         }
-
     }
 
+    /**
+     * Returns operations for export filtered by accounts and date range.
+     * Used by CSV export and balance calculation.
+     */
     private static void validateDateRange(LocalDate from, LocalDate to) {
         if (from != null && to != null && from.isAfter(to)) {
             throw BankStatementException.invalidDateRange();

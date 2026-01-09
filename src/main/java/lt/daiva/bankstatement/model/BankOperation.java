@@ -38,7 +38,9 @@ public class BankOperation {
     protected BankOperation() {
     }
 
-    public BankOperation(String accountNumber, LocalDateTime operationTime, String beneficiary, String operationComment, BigDecimal amount, String currency) {
+    public BankOperation(String accountNumber, LocalDateTime operationTime,
+                         String beneficiary, String operationComment,
+                         BigDecimal amount, String currency) {
         this.accountNumber = accountNumber;
         this.operationTime = operationTime;
         this.beneficiary = beneficiary;

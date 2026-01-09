@@ -33,14 +33,6 @@ class BankStatementControllerTest {
     BankStatementService service;
 
     @Test
-    void shouldReturn400WhenDateFormatIsInvalid() throws Exception {
-        mockMvc.perform(get("/api/v1/statements/accounts/LT1/balance")
-                        .param("from", "2025-01-02T09:15:00"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
-    }
-
-    @Test
     void shouldReturnBalance_whenRequestIsValid() throws Exception {
         when(service.calculateBalance(eq("LT100001"), any(), any()))
                 .thenReturn(new BalanceResponse("LT100001",
@@ -60,7 +52,8 @@ class BankStatementControllerTest {
     void shouldReturn400_whenDateFormatIsInvalid() throws Exception {
         mockMvc.perform(get("/api/v1/statements/accounts/LT1/balance")
                         .param("from", "2025-01-02T09:15:00"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
     }
 
     @Test
@@ -73,6 +66,7 @@ class BankStatementControllerTest {
         );
 
         mockMvc.perform(multipart("/api/v1/statements/import").file(file))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
     }
 }

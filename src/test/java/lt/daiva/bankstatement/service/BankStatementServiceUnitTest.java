@@ -80,7 +80,7 @@ class BankStatementServiceUnitTest {
     }
 
     @Test
-    void importFromCsv_shouldSaveOperations_andReturnCount() {
+    void importFromCsv_shouldSkipDuplicatesAndReturnCounts() {
         String csv = """
                 accountNumber,operationDateTime,beneficiary,comment,amount,currency
                 LT100001,2025-01-01T09:15:00,Employer,January salary,1500.00,EUR

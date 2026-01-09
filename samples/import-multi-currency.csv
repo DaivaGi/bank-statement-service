@@ -1,0 +1,9 @@
+accountNumber,operationDateTime,beneficiary,comment,amount,currency
+LT100001,2025-01-01T09:15:00,Employer,January salary,1500.00,EUR
+LT100001,2025-01-03T18:40:00,Maxima,Groceries,-85.32,EUR
+LT100001,2025-01-05T12:10:00,Upwork,Freelance payment,200.00,USD
+LT100001,2025-01-06T14:30:00,Amazon,Online shopping,-50.00,USD
+LT100001,2025-01-07T10:00:00,Revolut,Exchange bonus,30.00,GBP
+LT200002,2025-01-02T08:30:00,Swedbank,Loan payment,-250.00,EUR
+LT200002,2025-01-04T20:00:00,Netflix,Subscription,-15.99,EUR
+LT200002,2025-01-05T11:00:00,Stripe,Refund,20.00,USD
